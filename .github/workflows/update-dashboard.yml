@@ -1,0 +1,53 @@
+name: Update dashboard
+
+# Когда запускать
+on:
+  schedule:
+    - cron: '0 * * * *'      # каждый час (по UTC)
+  workflow_dispatch:          # + кнопка ручного запуска в интерфейсе
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Скачать код
+        uses: actions/checkout@v4
+
+      - name: Установить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Установить зависимости
+        run: pip install -r requirements.txt
+
+      - name: Собрать дашборд
+        env:
+          TIMEPAD_TOKEN:         ${{ secrets.TIMEPAD_TOKEN }}
+          TIMEPAD_EVENT_ID:      ${{ secrets.TIMEPAD_EVENT_ID }}
+          TICKETSCLOUD_KEY:      ${{ secrets.TICKETSCLOUD_KEY }}
+          TICKETSCLOUD_EVENT_ID: ${{ secrets.TICKETSCLOUD_EVENT_ID }}
+          DASHBOARD_OUTPUT:      public/index.html
+        run: python ticket_dashboard.py
+
+      - name: Подготовить публикацию
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Опубликовать на GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
